@@ -15,6 +15,12 @@ interface Token {
   charIndex: number;
 }
 
+// The three branches must partition the input exactly: '\n', any other
+// whitespace, everything else.  Classifying spaces with a narrower set than the
+// word branch stops on (/\s/) leaves characters — NBSP, thin space, \f, \v … —
+// that match no branch and advance no cursor, which spins forever pushing empty
+// tokens until the tab runs out of memory.  Both sides use /\s/, and the word
+// branch asserts it advanced.
 function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   let i = 0, id = 0;
@@ -23,14 +29,15 @@ function tokenize(text: string): Token[] {
     if (text[i] === '\n') {
       tokens.push({ id: id++, type: 'newline', text: '\n', charIndex: i });
       i++;
-    } else if (/[ \t\r]/.test(text[i])) {
+    } else if (/\s/.test(text[i])) {
       let j = i;
-      while (j < text.length && /[ \t\r]/.test(text[j])) j++;
+      while (j < text.length && /\s/.test(text[j]) && text[j] !== '\n') j++;
       tokens.push({ id: id++, type: 'space', text: text.slice(i, j), charIndex: i });
       i = j;
     } else {
       let j = i;
       while (j < text.length && !/\s/.test(text[j])) j++;
+      if (j === i) j++; // unreachable today; keeps the loop unable to stall
       tokens.push({ id: id++, type: 'word', text: text.slice(i, j), charIndex: i });
       i = j;
     }
